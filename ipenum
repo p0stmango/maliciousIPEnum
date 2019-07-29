@@ -1,0 +1,100 @@
+#!/usr/bin/python3
+import sys, requests, shodan
+shodan_api = shodan.Shodan('d2dZXMBa5ILZp9iws1891x3alNlfwyXi')
+if len(sys.argv) < 2:
+	print("USAGE: " + sys.argv[0] + " [IP ADDRESS]")
+	sys.exit()
+
+ip = sys.argv[2]
+command = sys.argv[1]
+
+def parseShodan(info):
+	isp = info['isp']
+	country = info["country_name"]
+	ports = info['ports']
+	vulns = info['vulns']
+	organisation = info['org']
+	print("---------------------------SHODAN INFO---------------------------\n")
+	print("ISP: "+ isp)
+	print("Country: " + country)
+	print("Org: " + organisation)
+	portstring = ""
+	vulnstring = ""
+	for vuln in vulns:
+		vulnstring += vuln + ", "
+	print("Vulnerabilities: "+ vulnstring[:-2])
+	ports.sort()
+	for port in ports:
+		portstring += str(port) + ","
+	print("Ports: " + portstring[:-1])
+
+def undetectedUrlLookup(undetectedURLS):
+	print("\n---------------------------SAFE URLS---------------------------\n")
+	for url in undetectedURLS:
+		address = url[0]
+		date = url[4]
+		print('SAFE URL: ' + address +  " | DATE SCANNED + " + date)
+
+def detectedUrlLookup(detectedURLS):
+	print("\n---------------------------MALICIOUS URLS---------------------------\n")
+	for url in detectedURLS:
+		address = url['url']
+		date = url['scan_date']
+		positives = url['positives']
+		print('UNSAFE URL: ' + address + " | POSITIVES: " + str(positives) +  " | DATE SCANNED: " + date)
+
+def hostnameLookup(hostnames):
+	print("\n---------------------------RESOLVED HOSTNAMES---------------------------\n")
+	for hostname in hostnames:
+		resolvedDate = hostname['last_resolved']
+		name = hostname['hostname']
+		print("HOSTNAME: " + name + " | RESOLVED ON: " + resolvedDate)
+
+def maliciousSampleLookup(maliciousSamples):
+	print("\n---------------------------MALICIOUS BINARIES---------------------------\n")
+	for sample in maliciousSamples:
+		sampleHash = sample['sha256']
+		positives = sample['positives']
+		date = sample['date']
+		print('MALICIOUS SAMPLE HASH: ' + sampleHash + " | POSITIVES: " + str(positives) + " | SCANNED ON " + date)
+
+def benignSampleLookup(benignSamples):
+	print("\n---------------------------SAFE BINARIES---------------------------\n")
+	for sample in benignSamples:
+		sampleHash = sample['sha256']
+		date = sample['date']
+		print('BENIGN SAMPLE HASH: ' + sampleHash + " | SCANNED ON: " + date)
+
+virustotalURL = 'https://www.virustotal.com/vtapi/v2/ip-address/report?apikey=ef7228ad7080e5d8a904391848fabe729330a06ee468b76688f59f7f6d30143e&ip='
+vtLookup = virustotalURL + ip
+
+r = requests.get(url = vtLookup)
+data = r.json()
+undetectedURLS = data['undetected_urls']
+hostnames = data['resolutions']
+detectedURLS = data['detected_urls']
+maliciousSamples = data['detected_downloaded_samples']
+benignSamples = data['undetected_downloaded_samples']
+shodanInfo = shodan_api.host(ip)
+
+if command == '-a':
+	parseShodan(shodanInfo)
+	hostnameLookup(hostnames)
+	undetectedUrlLookup(undetectedURLS)
+	detectedUrlLookup(detectedURLS)
+	maliciousSampleLookup(maliciousSamples)
+	benignSampleLookup(benignSamples)
+elif command == '-n':
+	parseShodan(shodanInfo)
+	undetectedUrlLookup(undetectedURLS)
+	detectedUrlLookup(detectedURLS)
+	maliciousSampleLookup(maliciousSamples)
+	benignSampleLookup(benignSamples)
+elif command == '-b':
+	maliciousSampleLookup(maliciousSamples)
+	benignSampleLookup(benignSamples)
+elif command == '-u':
+	undetectedUrlLookup(undetectedURLS)
+	detectedUrlLookup(detectedURLS)
+elif command == "-s":
+	parseShodan(shodanInfo)
