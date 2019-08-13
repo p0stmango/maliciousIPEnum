@@ -1,0 +1,252 @@
+#!/usr/bin/python3
+import sys, requests, shodan, socket
+
+if len(sys.argv) < 3:
+	print("USAGE: " + sys.argv[0] + "['-n','-a','-s','-whatever the other option is'] [IP ADDRESS]")
+	sys.exit()
+
+ip = sys.argv[2]
+command = sys.argv[1]
+
+shodan_api = shodan.Shodan('d2dZXMBa5ILZp9iws1891x3alNlfwyXi')
+virustotalIPURL = 'https://www.virustotal.com/vtapi/v2/ip-address/report?apikey=ef7228ad7080e5d8a904391848fabe729330a06ee468b76688f59f7f6d30143e&ip='
+vtLookup = virustotalIPURL + ip
+ipabusedbKey = '5be0817c8b2232cd052851bc744995424912f8483ac9503c2872726a500a3f0936a964e7e117ec48'
+virustotalDomainURL = 'https://www.virustotal.com/vtapi/v2/domain/report?apikey=ef7228ad7080e5d8a904391848fabe729330a06ee468b76688f59f7f6d30143e&domain='
+
+def domainLookup(domain):
+	lookupURL = virustotalDomainURL + domain
+	request = requests.get(url = lookupURL)
+	data = request.json()
+	try:
+		bitdefender = data['BitDefender category']
+	except KeyError:
+		bitdefender = ""
+	try:
+		undetectedReferrers = data['undetected_referrer_samples']
+	except KeyError:
+		undetectedReferrers = []
+	try:
+		detectedReferrers = data['detected_referrer_samples']
+	except KeyError:
+		detectedReferrers = []
+	try:
+		forcepoint = data['Forcepoint ThreatSeeker category']
+	except KeyError:
+		forcepoint = ""
+	try:
+		undetectedDownloads = data['undetected_downloaded_samples']
+	except KeyError:
+		undetectedDownloads = []
+	try:
+		detectedDownloads = data['detected_downloaded_samples']
+	except KeyError:
+		detectedDownloads = []
+	try:
+		resolutions = data['resolutions']
+	except KeyError:
+		resolutions = []
+	try:
+		domainSiblings = data['domain_siblings']
+	except KeyError:
+		domainSiblings = []
+	try:
+		undetectedURLS = data['undetected_urls']
+	except KeyError:
+		undetectedURLS = []
+	try:
+		detectedURLS = data['detected_urls']
+	except KeyError:
+		detectedURLS = []
+	try:
+		subdomains = data['subdomains']
+	except KeyError:
+		subdomains = []
+	print("\n---------------------------DOMAIN INFORMATION---------------------------\n")
+	print("BITDEFENDER CATEGORY: " + bitdefender)
+	print("FORCEPOINT THREATSEEKER CATEGORY: " + forcepoint)
+	print("\n ---------------------------SIBLING DOMAINS---------------------------\n")
+	for domain in domainSiblings:
+		print("SIBLING DOMAIN: " + domain)
+	print("\n ---------------------------SUBDOMAINS---------------------------\n")
+	for domain in subdomains:
+		print("SUBDOMAIN: " + domain)
+	print("\n ---------------------------HISTORICAL IP RESOLUTIONS---------------------------\n")
+	for resolution in resolutions:
+		print("IP: " + resolution['ip_address'] + " | RESOLVED ON: " + resolution['last_resolved'])
+	print("\n ---------------------------SAFE URLS---------------------------\n")
+	for url in undetectedURLS:
+		print("SAFE URL: " + url[0] + " |  SCANNED ON: " + url[4])
+	print("\n ---------------------------DETECTED URLS---------------------------\n")
+	for url in detectedURLS:
+		print("DETECTED URL: " + url['url'] + " | POSITVES: " + str(url['positives']) + " | SCANNED ON: " + url['scan_date'])
+	print("\n ---------------------------MALICIOUS HOSTED FILES---------------------------\n")
+	for binary in detectedDownloads:
+		print("MALICIOUS HASH: " + binary['sha256'] + " | POSITIVES: " + str(binary['positives']) + " | SCANNED ON: " + binary['date'])
+	print("\n ---------------------------SAFE HOSTED FILES---------------------------\n")
+	for binary in undetectedDownloads:
+		print("SAFE HASH: " + binary['sha256'] + " | SCANNED ON: " + binary['date'])
+	print("\n ---------------------------REFERRING FILES---------------------------\n")
+	for binary in undetectedReferrers:
+		print("SAFE REFERRER HASH: " + binary['sha256'])
+	for binary in detectedReferrers:
+		print("MALICIOUS REFERRER HASH: " + binary['sha256'] + " | POSITIVES: " + str(binary['positives']))
+
+def parseShodan(info):
+	vulns = []
+	isp = info['isp']
+	country = info["country_name"]
+	ports = info['ports']
+	if 'vulns' in info:
+		vulns = info['vulns']
+	print("---------------------------SHODAN INFO---------------------------\n")
+	print("ISP: "+ isp)
+	print("Country: " + country)
+	if 'org' in info:
+		organisation = info['org']
+		print("Org: " + organisation)
+	portstring = ""
+	vulnstring = ""
+	for vuln in vulns:
+		vulnstring += vuln + ", "
+	print("Vulnerabilities: "+ vulnstring[:-2])
+	ports.sort()
+	for port in ports:
+		portstring += str(port) + ","
+	print("Ports: " + portstring[:-1])
+
+def undetectedUrlLookup(undetectedURLS):
+	print("\n---------------------------SAFE URLS---------------------------\n")
+	for url in undetectedURLS:
+		address = url[0]
+		date = url[4]
+		print('SAFE URL: ' + address +  " | DATE SCANNED: " + date)
+
+def detectedUrlLookup(detectedURLS):
+	print("\n---------------------------MALICIOUS URLS---------------------------\n")
+	for url in detectedURLS:
+		address = url['url']
+		date = url['scan_date']
+		positives = url['positives']
+		print('UNSAFE URL: ' + address + " | POSITIVES: " + str(positives) +  " | DATE SCANNED: " + date)
+
+def hostnameLookup(hostnames):
+	print("\n---------------------------RESOLVED HOSTNAMES---------------------------\n")
+	for hostname in hostnames:
+		resolvedDate = hostname['last_resolved']
+		name = hostname['hostname']
+		print("HOSTNAME: " + name + " | RESOLVED ON: " + resolvedDate)
+
+def maliciousSampleLookup(maliciousSamples):
+	print("\n---------------------------MALICIOUS BINARIES---------------------------\n")
+	for sample in maliciousSamples:
+		sampleHash = sample['sha256']
+		positives = sample['positives']
+		date = sample['date']
+		print('MALICIOUS SAMPLE HASH: ' + sampleHash + " | POSITIVES: " + str(positives) + " | SCANNED ON " + date)
+
+def benignSampleLookup(benignSamples):
+	print("\n---------------------------SAFE BINARIES---------------------------\n")
+	for sample in benignSamples:
+		sampleHash = sample['sha256']
+		date = sample['date']
+		print('BENIGN SAMPLE HASH: ' + sampleHash + " | SCANNED ON: " + date)
+
+def parseIPAbuseDB(ip):
+	HEADERS = {'Key':ipabusedbKey, 'Accept':'application/json'}
+	ipAbuseDBURL = "https://api.abuseipdb.com/api/v2/check/"
+	PARAMS = {'ipAddress':ip}
+	abusedbrequest = requests.get(url = ipAbuseDBURL, params = PARAMS, headers = HEADERS)
+	abuseData = abusedbrequest.json()
+	try:
+		parseData = abuseData['data']
+		abuseScore = parseData['abuseConfidenceScore']
+		reportNum = parseData['totalReports']
+		lastReported = parseData['lastReportedAt']
+		whitelisted = parseData['isWhitelisted']
+		country = parseData['countryCode']
+		isp = parseData['isp']
+		print('\n---------------------------IPABUSE REPORT---------------------------\n')
+		print("Reported " + str(reportNum) + " times")
+		print("COUNTRY CODE: " + country)
+		print("ISP: " + isp)
+		print("ABUSE CONFIDENCE PERCENTAGE: " + str(abuseScore))
+		print("LAST REPORTED AT: " + str(lastReported))
+		print("HOST WHITELISTS: " + str(whitelisted))
+	except KeyError:
+		print("No IPAbuseDB Data for this host")
+
+if (ip.isupper() or ip.islower()) == False:
+	
+	try:
+		vtRequest = requests.get(url = vtLookup)
+		vtData = vtRequest.json()
+		if vtData != {'response_code': 0, 'verbose_msg': 'Missing IP address'}:
+			try:
+				undetectedURLS = vtData['undetected_urls']
+			except KeyError:
+				undetectedURLS = []
+			try:
+				hostnames = vtData['resolutions']
+			except KeyError:
+				hostnames = []
+			try:
+				detectedURLS = vtData['detected_urls']
+			except KeyError:
+				detectedURLS = []
+			try:
+				maliciousSamples = vtData['detected_downloaded_samples']
+			except KeyError:
+				maliciousSamples = []
+			try:
+				benignSamples = vtData['undetected_downloaded_samples']
+			except KeyError:
+				benignSamples = []
+			vtFlag = True
+		else:
+			print("There is no virustotal information about this host")
+			vtFlag = False
+		try:
+			shodanInfo = shodan_api.host(ip)
+		
+		except shodan.exception.APIError:
+			print("Shodan has no information for that host")
+			shodanInfo = None
+		
+		if command == '-a':
+			if shodanInfo != None:
+				parseShodan(shodanInfo)
+			parseIPAbuseDB(ip)
+			if vtFlag == True:
+				hostnameLookup(hostnames)
+				undetectedUrlLookup(undetectedURLS)
+				detectedUrlLookup(detectedURLS)
+				maliciousSampleLookup(maliciousSamples)
+				benignSampleLookup(benignSamples)
+		elif command == '-n':
+			if shodanInfo != None:
+				parseShodan(shodanInfo)
+			parseIPAbuseDB(ip)
+			if vtFlag == True:
+				undetectedUrlLookup(undetectedURLS)
+				detectedUrlLookup(detectedURLS)
+				maliciousSampleLookup(maliciousSamples)
+				benignSampleLookup(benignSamples)
+		elif command == '-h':
+			hostnameLookup(hostnames)
+		elif command == '-b':
+			if vtFlag == True:
+				maliciousSampleLookup(maliciousSamples)
+				benignSampleLookup(benignSamples)
+		elif command == '-u':
+			undetectedUrlLookup(undetectedURLS)
+			detectedUrlLookup(detectedURLS)
+		elif command == "-s":
+			if shodanInfo != None:
+				parseShodan(shodanInfo)
+	except socket.gaierror:
+		print("Cannot connect to the internet")
+	except requests.exceptions.ConnectionError:
+		print("Internet may be down")
+else:
+	domainLookup(ip)
