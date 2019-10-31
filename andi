@@ -8,11 +8,13 @@ if len(sys.argv) < 3:
 ip = sys.argv[2]
 command = sys.argv[1]
 
-shodan_api = shodan.Shodan('d2dZXMBa5ILZp9iws1891x3alNlfwyXi')
-virustotalIPURL = 'https://www.virustotal.com/vtapi/v2/ip-address/report?apikey=ef7228ad7080e5d8a904391848fabe729330a06ee468b76688f59f7f6d30143e&ip='
+shodan_api = shodan.Shodan('')
+vtapikey = ''
+ipabusedbKey = ''
+
+virustotalIPURL = 'https://www.virustotal.com/vtapi/v2/ip-address/report?apikey=' + vtapikey +'&ip='
 vtLookup = virustotalIPURL + ip
-ipabusedbKey = '5be0817c8b2232cd052851bc744995424912f8483ac9503c2872726a500a3f0936a964e7e117ec48'
-virustotalDomainURL = 'https://www.virustotal.com/vtapi/v2/domain/report?apikey=ef7228ad7080e5d8a904391848fabe729330a06ee468b76688f59f7f6d30143e&domain='
+virustotalDomainURL = 'https://www.virustotal.com/vtapi/v2/domain/report?apikey=' + vtapikey +'&domain='
 
 def domainLookup(domain):
 	lookupURL = virustotalDomainURL + domain
