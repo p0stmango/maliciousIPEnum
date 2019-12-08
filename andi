@@ -8,13 +8,11 @@ if len(sys.argv) < 3:
 ip = sys.argv[2]
 command = sys.argv[1]
 
-shodan_api = shodan.Shodan('')
-vtapikey = ''
-ipabusedbKey = ''
-
-virustotalIPURL = 'https://www.virustotal.com/vtapi/v2/ip-address/report?apikey=' + vtapikey +'&ip='
+shodan_api = shodan.Shodan('d2dZXMBa5ILZp9iws1891x3alNlfwyXi')
+virustotalIPURL = 'https://www.virustotal.com/vtapi/v2/ip-address/report?apikey=ef7228ad7080e5d8a904391848fabe729330a06ee468b76688f59f7f6d30143e&ip='
 vtLookup = virustotalIPURL + ip
-virustotalDomainURL = 'https://www.virustotal.com/vtapi/v2/domain/report?apikey=' + vtapikey +'&domain='
+ipabusedbKey = '5be0817c8b2232cd052851bc744995424912f8483ac9503c2872726a500a3f0936a964e7e117ec48'
+virustotalDomainURL = 'https://www.virustotal.com/vtapi/v2/domain/report?apikey=ef7228ad7080e5d8a904391848fabe729330a06ee468b76688f59f7f6d30143e&domain='
 
 def domainLookup(domain):
 	lookupURL = virustotalDomainURL + domain
@@ -90,9 +88,9 @@ def domainLookup(domain):
 		print("SAFE HASH: " + binary['sha256'] + " | SCANNED ON: " + binary['date'])
 	print("\n ---------------------------REFERRING FILES---------------------------\n")
 	for binary in undetectedReferrers:
-		print("SAFE REFERRER HASH: " + binary['sha256'])
+            print("SAFE REFERRER HASH: " + binary['sha256'] + ' | SCANNED ON:  ' + binary['date'])
 	for binary in detectedReferrers:
-		print("MALICIOUS REFERRER HASH: " + binary['sha256'] + " | POSITIVES: " + str(binary['positives']))
+            print("MALICIOUS REFERRER HASH: " + binary['sha256'] + " | POSITIVES: " + str(binary['positives']) + " | SCANNED ON: " + binary['date'] )
 
 def parseShodan(info):
 	vulns = []
@@ -126,7 +124,8 @@ def undetectedUrlLookup(undetectedURLS):
 
 def detectedUrlLookup(detectedURLS):
 	print("\n---------------------------MALICIOUS URLS---------------------------\n")
-	for url in detectedURLS:
+	sortedURLS = sorted(detectedURLS, key = lambda k: k['positives'], reverse=True)
+	for url in sortedURLS:
 		address = url['url']
 		date = url['scan_date']
 		positives = url['positives']
@@ -134,14 +133,16 @@ def detectedUrlLookup(detectedURLS):
 
 def hostnameLookup(hostnames):
 	print("\n---------------------------RESOLVED HOSTNAMES---------------------------\n")
-	for hostname in hostnames:
+	sortedHostnames = sorted(hostnames, key = lambda k: k['last_resolved'], reverse=True)
+	for hostname in sortedHostnames:
 		resolvedDate = hostname['last_resolved']
 		name = hostname['hostname']
 		print("HOSTNAME: " + name + " | RESOLVED ON: " + resolvedDate)
 
 def maliciousSampleLookup(maliciousSamples):
 	print("\n---------------------------MALICIOUS BINARIES---------------------------\n")
-	for sample in maliciousSamples:
+	sortedMalSamples = sorted(maliciousSamples, key = lambda k: k['positives'], reverse=True)
+	for sample in sortedMalSamples:
 		sampleHash = sample['sha256']
 		positives = sample['positives']
 		date = sample['date']
@@ -170,7 +171,7 @@ def parseIPAbuseDB(ip):
 		isp = parseData['isp']
 		print('\n---------------------------IPABUSE REPORT---------------------------\n')
 		print("Reported " + str(reportNum) + " times")
-		print("COUNTRY CODE: " + country)
+		print("COUNTRY CODE: " + str(country))
 		print("ISP: " + isp)
 		print("ABUSE CONFIDENCE PERCENTAGE: " + str(abuseScore))
 		print("LAST REPORTED AT: " + str(lastReported))
